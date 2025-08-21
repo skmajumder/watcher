@@ -70,7 +70,7 @@ export const isServer = (): boolean => !isBrowser();
  * }
  * ```
  */
-export const isNode = () =>
+export const isNode = (): string | false =>
   typeof process !== 'undefined' && process.versions?.node;
 
 /**

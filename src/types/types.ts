@@ -1,6 +1,6 @@
 /**
  * Watcher SDK - Type Definitions
- * 
+ *
  * This file contains all the core type definitions for the Watcher SDK,
  * which is a high-performance error tracking SDK for Next.js and React applications.
  */
@@ -18,13 +18,13 @@ export type WatcherEnv = 'development' | 'production' | 'test' | 'staging';
 export interface WatcherConfig {
   /** The environment where the SDK is running */
   environment: WatcherEnv;
-  /** 
+  /**
    * Sampling rate for error collection (0.0 to 1.0)
    * 0.0 = no errors collected, 1.0 = all errors collected
    * Useful for production environments to reduce data volume
    */
   sampleRate?: number;
-  /** 
+  /**
    * Maximum number of breadcrumbs to store per error
    * Breadcrumbs provide context about user actions leading to errors
    */
@@ -36,12 +36,10 @@ export interface WatcherConfig {
  * Each type represents a different source or nature of errors
  */
 export type ErrorKind =
-  | 'runtime_error'      // General JavaScript runtime errors
-  | 'unhandled_promise'  // Unhandled promise rejections
-  | 'promise_rejection'  // Explicitly rejected promises
-  | 'network_error'      // Network request failures
-  | 'http_error'         // HTTP response errors (4xx, 5xx)
-  | 'render_error';      // React rendering errors
+  | 'runtime_error' // General JavaScript runtime errors
+  | 'unhandled_promise' // Unhandled promise rejections
+  | 'render_error' // React rendering errors
+  | 'network_error'; // Network request failures
 
 /**
  * Complete error information payload
