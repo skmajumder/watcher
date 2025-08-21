@@ -1,0 +1,14 @@
+{
+  "name": "watcher",
+  "version": "0.1.0",
+  "description": "High‑performance error tracking SDK for Next.js and React.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "SK Majumder",
+  "license": "MIT",
+  "type": "module",
+  "private": "false"
+}
