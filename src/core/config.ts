@@ -1,10 +1,18 @@
+/**
+ * Watcher SDK - Core Configuration
+ *
+ * This file contains the configuration management for the Watcher SDK.
+ * It provides functions to set and retrieve the configuration object.
+ *
+ * singleton to hold config object
+ */
+
 import { WatcherConfig } from '../types/types';
 
 let _config: WatcherConfig | null = null;
 
 export const setConfig = (c: WatcherConfig): void => {
   if (!c || typeof c !== 'object') {
-    // Optionally, you could throw a custom error here for stricter validation
     console.error('Invalid configuration object provided to setConfig.');
     return;
   }
