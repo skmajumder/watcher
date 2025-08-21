@@ -14,6 +14,17 @@ export type WatcherEnv = 'development' | 'production' | 'test' | 'staging';
 /**
  * Configuration interface for the Watcher SDK
  * Contains all configurable options for error tracking and SDK behavior
+ * 
+ * @example
+ * ```typescript
+ * import { initWatcher } from 'watcher';
+ * 
+ * initWatcher({
+ *   environment: 'production',
+ *   sampleRate: 0.1,
+ *   maxBreadcrumbs: 50
+ * });
+ * ```
  */
 export interface WatcherConfig {
   /** The environment where the SDK is running */
