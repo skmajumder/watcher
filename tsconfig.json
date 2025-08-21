@@ -1,16 +1,39 @@
 {
   "compilerOptions": {
+    // Target ES2021 for modern JavaScript features while maintaining broad compatibility
     "target": "ES2021",
+    
+    // Include DOM types for browser environment support
     "lib": ["ES2021", "DOM"],
+    
+    // Use ESNext module system for modern module resolution
     "module": "ESNext",
+    
+    // Use bundler module resolution for better compatibility with build tools
     "moduleResolution": "Bundler",
+    
+    // Enable strict type checking for better code quality
     "strict": true,
+    
+    // Output directory for compiled files
     "outDir": "./dist",
+    
+    // Skip type checking of declaration files for faster builds
     "skipLibCheck": true,
+    
+    // Enable JSON module imports
     "resolveJsonModule": true,
+    
+    // Enable ES module interop for CommonJS compatibility
     "esModuleInterop": true,
+    
+    // Ensure consistent file naming across different operating systems
     "forceConsistentCasingInFileNames": true,
+    
+    // Don't emit files during type checking (tsup handles the build)
     "noEmit": true
   },
+  
+  // Include source files and tests in compilation
   "include": ["src", "tests"]
 }
