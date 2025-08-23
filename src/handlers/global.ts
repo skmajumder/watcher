@@ -6,15 +6,22 @@
  * capture unhandled errors and promise rejections across the entire application.
  *
  * **Current Status (Milestone 1.2):**
- * - Placeholder structure for global error handlers
- * - Will be implemented in Step 1.4
- *
- * **Future Implementation (Step 1.4):**
- * - window.onerror for general JavaScript errors
- * - window.addEventListener('unhandledrejection') for promise rejections
- * - Error categorization and processing
- * - Breadcrumb tracking for error context
+ * - Fully implemented global error handlers
+ * - Browser-specific error capture (window.onerror, onunhandledrejection)
+ * - Automatic error payload creation and processing
  * - Integration with the error processor
+ *
+ * **Implemented Features:**
+ * - **window.onerror**: Captures synchronous JavaScript runtime errors
+ * - **window.onunhandledrejection**: Captures unhandled promise rejections
+ * - **Error Payload Creation**: Converts browser errors to SDK format
+ * - **Context Collection**: URL, route, user agent, and environment info
+ * - **Safe Processing**: Error handlers never throw exceptions
+ *
+ * **Error Capture Strategy:**
+ * Global handlers act as a "safety net" to catch errors that weren't
+ * handled by try/catch blocks or error boundaries. This ensures comprehensive
+ * error coverage across the entire application.
  */
 
 import { processError } from '../core/processor';
@@ -25,37 +32,55 @@ import { isBrowser, nowIso } from '../utils';
  * Flag to track if global handlers have been installed
  *
  * This flag prevents multiple installations of global handlers
- * to avoid duplicate event listeners and potential memory leaks
+ * to avoid duplicate event listeners and potential memory leaks.
+ * 
+ * **Why this is important:**
+ * - Prevents duplicate error processing
+ * - Avoids memory leaks from multiple listeners
+ * - Ensures consistent error handling behavior
+ * - Maintains clean event listener management
+ *
+ * @private
+ * @type {boolean}
  */
 let installed: boolean = false;
 
 /**
- * Installs global error handlers for the application
+ * Installs global error handlers for comprehensive error capture
  *
  * This function sets up global error monitoring by attaching event listeners
  * to capture unhandled errors and promise rejections. It's a critical component
  * for comprehensive error tracking across the entire application.
  *
- * **Handler Types to be Implemented:**
+ * **Installation Process:**
+ * 1. **Duplicate Check**: Prevents multiple installations
+ * 2. **Environment Validation**: Only installs in browser environments
+ * 3. **Handler Setup**: Configures window.onerror and onunhandledrejection
+ * 4. **Flag Management**: Sets installed flag to prevent re-installation
  *
- * **window.onerror:**
+ * **Handler Types:**
+ *
+ * **window.onerror (Synchronous Errors):**
  * - Captures general JavaScript runtime errors
- * - Provides error message, source file, and line number
+ * - Provides error message, source file, line number, and column
  * - Handles syntax errors and other runtime exceptions
+ * - Last-line defense for unhandled synchronous errors
  *
- * **unhandledrejection:**
+ * **window.onunhandledrejection (Asynchronous Errors):**
  * - Captures unhandled promise rejections
  * - Provides rejection reason and promise details
  * - Critical for async error tracking
+ * - Handles Promise.reject() without .catch()
  *
  * **Error Processing Pipeline:**
  * 1. Capture error/rejection event
  * 2. Extract relevant information (message, stack, source)
- * 3. Create ErrorPayload object
- * 4. Send to error processor for deduplication
- * 5. Forward to transport layer for reporting
+ * 3. Create standardized ErrorPayload object
+ * 4. Add contextual information (URL, route, user agent)
+ * 5. Send to error processor for deduplication and sampling
+ * 6. Forward to transport layer for reporting
  *
- * @param {WatcherConfig} _cfg - Configuration object for error handling
+ * @param {WatcherConfig} _config - Configuration object for error handling
  *
  * @example
  * ```typescript
@@ -68,83 +93,145 @@ let installed: boolean = false;
  *   maxBreadcrumbs: 20
  * });
  *
- * // After installation, all unhandled errors will be automatically captured
- * // and processed by the Watcher SDK
+ * // After installation, all unhandled errors will be automatically captured:
+ * // - Runtime errors (TypeError, ReferenceError, etc.)
+ * // - Unhandled promise rejections
+ * // - Syntax errors (in some browsers)
+ * // - Network errors (in some cases)
  * ```
  *
- * **Current Implementation:**
- * - Placeholder function awaiting Step 1.4 implementation
- * - Will integrate with core error processor
- * - Will support configuration-based error handling
+ * **Browser Compatibility:**
+ * - **window.onerror**: Supported in all modern browsers
+ * - **window.onunhandledrejection**: Supported in all modern browsers
+ * - Graceful degradation for older browsers
+ * - Safe error handling with try-catch protection
+ *
+ * **Error Context Collection:**
+ * Each captured error includes:
+ * - Current URL and route information
+ * - User agent string for browser identification
+ * - Environment context from configuration
+ * - Precise timestamp of occurrence
+ * - Source file and line/column position
  *
  * @since 0.1.0
- * @version Milestone 1.2 (placeholder)
+ * @version Milestone 1.2 (fully implemented)
  */
-
 export function installGlobalHandlers(_config: WatcherConfig) {
-  // If global handlers have already been installed, exit early
+  // Prevent multiple installations to avoid duplicate handlers
   if (installed) return;
 
-  // Set the installed flag to true to prevent multiple installations
+  // Mark handlers as installed to prevent re-installation
   installed = true;
 
-  // If not in browser, exit early. Browser only.
-  if (!isBrowser) return;
+  // Only install handlers in browser environments
+  // Server-side error handling is handled separately
+  if (!isBrowser()) return;
 
-  // uncaught synchronous exceptions.
-  // it is net for synchronous errors.
-  // window.onerror is the last-line defense to catch runtime errors that didn’t handle with try/catch or error boundaries,
-  // so we can report them to our SDK
+  /**
+   * Global error handler for synchronous JavaScript errors
+   *
+   * This handler catches runtime errors that weren't handled by try/catch
+   * blocks or error boundaries. It's the last line of defense for
+   * unhandled synchronous errors.
+   *
+   * **What it captures:**
+   * - TypeError, ReferenceError, SyntaxError, etc.
+   * - Runtime exceptions from JavaScript execution
+   * - Errors in event handlers and callbacks
+   * - Errors in imported modules and scripts
+   *
+   * **Parameters:**
+   * - message: Error message string
+   * - source: Source file URL
+   * - lineno: Line number where error occurred
+   * - colno: Column number where error occurred
+   * - error: Error object with stack trace
+   */
   window.onerror = (message, source, lineno, colno, error) => {
     try {
+      // Create standardized error payload from browser error information
       const payload: ErrorPayload = {
         type: 'runtime_error',
-        name: error?.name,
-        message: String(message),
-        stack: error?.stack,
-        source,
-        position:
-          lineno !== null && colno !== null
-            ? `line: ${lineno}, col: ${colno}`
-            : undefined,
-        url: window.location.href,
-        route: window.location.pathname,
-        userAgent: navigator?.userAgent,
-        environment: _config.environment,
-        timestamp: nowIso(),
+        name: error?.name,                    // Error constructor name
+        message: String(message),             // Convert to string for consistency
+        stack: error?.stack,                  // Full stack trace if available
+        source,                               // Source file URL
+        position: lineno !== null && colno !== null
+          ? `line: ${lineno}, col: ${colno}`  // Precise position information
+          : undefined,
+        url: window.location.href,            // Current page URL
+        route: window.location.pathname,      // Current route/path
+        userAgent: navigator?.userAgent,      // Browser identification
+        environment: _config.environment,     // Environment from config
+        timestamp: nowIso(),                  // ISO timestamp
       };
 
+      // Send to error processor for deduplication and sampling
       processError(payload);
-    } catch {
-      /* swallow */
+    } catch (handlerError) {
+      /**
+       * Error handler should never throw
+       *
+       * If the error handler itself fails, we silently catch it
+       * to prevent the application from crashing. This is critical
+       * for maintaining application stability.
+       */
     }
 
-    return false; // let browser also log the error in console
+    // Return false to allow browser's default error handling
+    // This ensures errors still appear in console for debugging
+    return false;
   };
 
-  // unhandled promise rejections.
-  // window.onunhandledrejection is the net for asynchronous errors (unhandled Promise rejections).
-  // Fires when a Promise rejects and no .catch() (or try/catch with await) handles it.
-  // The handler receives a PromiseRejectionEvent object.
-  window.onunhandledrejection = (event) => {
+  /**
+   * Global handler for unhandled promise rejections
+   *
+   * This handler catches promise rejections that weren't handled by
+   * .catch() methods or try/catch blocks with await. It's essential
+   * for tracking asynchronous errors.
+   *
+   * **What it captures:**
+   * - Promise.reject() calls without .catch()
+   - Async function errors without try/catch
+   * - Promise chain failures
+   * - Network request rejections
+   * - Timer and event promise rejections
+   *
+   * **Event Structure:**
+   * The event contains a 'reason' property that can be:
+   * - An Error object with stack trace
+   * - A string message
+   * - Any other value passed to Promise.reject()
+   */
+  window.addEventListener('unhandledrejection', (event) => {
     try {
-      const reason: any = (event as any).reason;
+      // Extract rejection reason from the event
+      const reason: any = event.reason;
+      
+      // Create standardized error payload
       const payload: ErrorPayload = {
         type: 'unhandled_promise',
-        name: reason?.name,
-        message:
-          reason?.message ?? (typeof reason === 'string' ? reason : undefined),
-        stack: reason?.stack,
-        url: window.location.href,
-        route: window.location.pathname,
-        userAgent: navigator?.userAgent,
-        environment: _config.environment,
-        timestamp: nowIso(),
+        name: reason?.name,                   // Error constructor name if available
+        message: reason?.message ?? (typeof reason === 'string' ? reason : undefined),
+        stack: reason?.stack,                 // Stack trace if available
+        url: window.location.href,            // Current page URL
+        route: window.location.pathname,      // Current route/path
+        userAgent: navigator?.userAgent,      // Browser identification
+        environment: _config.environment,     // Environment from config
+        timestamp: nowIso(),                  // ISO timestamp
       };
 
+      // Send to error processor for deduplication and sampling
       processError(payload);
-    } catch {
-      /* swallow */
+    } catch (handlerError) {
+      /**
+       * Promise rejection handler should never throw
+       *
+       * If the promise rejection handler fails, we silently catch it
+       * to prevent the application from crashing. This maintains
+       * the stability of the error handling system.
+       */
     }
-  };
+  });
 }

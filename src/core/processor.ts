@@ -2,15 +2,23 @@
  * Watcher SDK - Core Error Processor
  *
  * This file contains the core error processing logic for the Watcher SDK.
- * It implements error deduplication, hash-based identification, and the
- * main processing pipeline for incoming error payloads.
+ * It implements error deduplication, hash-based identification, sampling,
+ * and the main processing pipeline for incoming error payloads.
  *
- * The processor provides:
- * - Error deduplication to prevent spam
- * - Hash-based error identification
- * - Configurable deduplication timeframes
- * - Safe error processing with try-catch protection
- * - Foundation for future transport layer integration
+ * **Core Features:**
+ * - **Error Sampling**: Configurable rate limiting based on sampleRate
+ * - **Deduplication**: Prevents duplicate error spam with time-based memory management
+ * - **Hash Generation**: Creates unique error signatures for identification
+ * - **Safe Processing**: Never throws errors, ensuring SDK resilience
+ * - **Non-blocking Output**: Uses queueMicrotask for console logging
+ *
+ * **Processing Pipeline:**
+ * 1. Configuration Retrieval: Get current SDK configuration
+ * 2. Sampling Check: Determine if error should be processed
+ * 3. Hash Generation: Create unique error identifier
+ * 4. Deduplication: Check if error was recently processed
+ * 5. Memory Management: Schedule hash cleanup
+ * 6. Error Output: Log to console (non-blocking)
  */
 
 import { ErrorPayload, WatcherConfig } from '../types/types';
@@ -24,6 +32,11 @@ import { getConfig } from './config';
  * duplicate error reports from flooding the system. Each hash represents
  * a unique error signature based on message, name, and stack trace.
  *
+ * **Memory Management:**
+ * - Hashes are automatically removed after dedupeMs milliseconds
+ * - Prevents memory leaks while maintaining deduplication effectiveness
+ * - Uses setTimeout for cleanup scheduling
+ *
  * @private
  * @type {Set<string>}
  */
@@ -36,9 +49,16 @@ const recent: Set<string> = new Set<string>();
  * duplicates. After this time, the error hash is removed from the recent
  * set and can be processed again if it occurs.
  *
- * Current value: 3 seconds (3000ms)
- * This provides a good balance between preventing spam and allowing
- * legitimate repeated errors to be tracked.
+ * **Current Value: 3 seconds (3000ms)**
+ * This provides a good balance between:
+ * - Preventing error spam from rapid-fire errors
+ * - Allowing legitimate repeated errors to be tracked after a delay
+ * - Maintaining reasonable memory usage
+ *
+ * **Tuning Considerations:**
+ * - Shorter windows: Less memory, more error reports
+ * - Longer windows: More memory, fewer duplicate reports
+ * - 3 seconds is optimal for most web applications
  *
  * @private
  * @type {number}
@@ -49,56 +69,70 @@ const dedupeMs: number = 3000;
 /**
  * Determines if an error should be sampled based on the configuration
  *
- * - This function uses a simple random sampling strategy to determine
- * if an error should be sampled based on the sampleRate configuration.
- * - The sampleRate is a number between 0 and 1, where 0 means no errors
- * are sampled and 1 means all errors are sampled.
+ * This function implements a simple random sampling strategy to control
+ * the volume of errors processed. It's useful for production environments
+ * where you want to reduce data volume while maintaining error visibility.
+ *
+ * **Sampling Strategy:**
+ * - Uses Math.random() for simple random sampling
+ * - sampleRate of 0.0 = no errors processed
+ * - sampleRate of 1.0 = all errors processed
+ * - sampleRate of 0.1 = approximately 10% of errors processed
+ *
+ * **Example Scenarios:**
+ * - Development: sampleRate = 1.0 (100% of errors)
+ * - Staging: sampleRate = 0.5 (50% of errors)
+ * - Production: sampleRate = 0.1 (10% of errors)
+ * - High-traffic: sampleRate = 0.01 (1% of errors)
+ *
+ * @param {WatcherConfig} cfg - The Watcher configuration object
+ * @returns {boolean} True if the error should be processed, false to skip
  *
  * @example
  * ```typescript
- * import { shouldSample } from 'watcher';
- *
- * const cfg: WatcherConfig = {
- *   sampleRate: 0.1,
- * };
- *
- * const shouldSample = shouldSample(cfg);
- * console.log(shouldSample); // true or false
+ * // Process 10% of errors in production
+ * const config = { sampleRate: 0.1 };
+ * const shouldProcess = shouldSample(config);
+ * 
+ * // Process all errors in development
+ * const devConfig = { sampleRate: 1.0 };
+ * const devShouldProcess = shouldSample(devConfig);
  * ```
  *
- * @param {WatcherConfig} cfg - The Watcher configuration
- * @returns {boolean} True if the error should be sampled, false otherwise
+ * @note This is a simple random sampling strategy. Future versions may
+ * implement more sophisticated sampling algorithms like:
+ * - Deterministic sampling based on error hash
+ * - Time-based sampling windows
+ * - Error type-specific sampling rates
  */
 function shouldSample(cfg: WatcherConfig): boolean {
-  const r = cfg?.sampleRate ?? 1;
-  return Math.random() < r; // TODO: Implement a better sampling strategy
+  // Get sample rate from config, default to 1.0 (100%) if not specified
+  const sampleRate = cfg?.sampleRate ?? 1;
+  
+  // Simple random sampling: return true if random value is less than sample rate
+  return Math.random() < sampleRate;
 }
 
 /**
- * Processes incoming error payloads with deduplication
+ * Processes incoming error payloads with comprehensive error handling
  *
  * This function is the main entry point for error processing in the SDK.
- * It performs several key operations:
+ * It implements a robust pipeline that handles errors safely without
+ * ever throwing exceptions that could crash the application.
  *
- * 1. **Error Identification**: Generates a unique hash from error details
- * 2. **Deduplication**: Prevents processing duplicate errors within the time window
- * 3. **Memory Management**: Automatically cleans up old error hashes
- * 4. **Future Transport**: Prepares for transport layer integration
+ * **Processing Steps:**
+ * 1. **Configuration Retrieval**: Get current SDK settings
+ * 2. **Sampling Check**: Apply rate limiting if configured
+ * 3. **Hash Generation**: Create unique error identifier
+ * 4. **Deduplication**: Skip if error was recently processed
+ * 5. **Memory Management**: Schedule hash cleanup
+ * 6. **Error Output**: Log to console using non-blocking approach
  *
- * **Hash Generation Strategy:**
- * The error hash is created from a combination of:
- * - Error message (primary identifier)
- * - Error name (constructor type)
- * - Stack trace (location information)
- *
- * This combination provides a good balance between uniqueness and
- * deduplication effectiveness.
- *
- * **Deduplication Logic:**
- * - If an error with the same hash exists in the recent set, it's skipped
- * - New errors are added to the recent set
- * - After dedupeMs milliseconds, the hash is automatically removed
- * - This prevents memory leaks while maintaining deduplication
+ * **Error Resilience:**
+ * - Wrapped in try-catch to prevent SDK crashes
+ * - Graceful degradation if any step fails
+ * - Never throws errors to calling code
+ * - Maintains application stability
  *
  * @param {ErrorPayload} p - The error payload to process
  *
@@ -116,22 +150,26 @@ function shouldSample(cfg: WatcherConfig): boolean {
  *   environment: 'development'
  * });
  *
- * // Processing the same error again within 3 seconds will be skipped
- * // This prevents error spam while maintaining error tracking
+ * // The function will:
+ * // 1. Check if error should be sampled
+ * // 2. Generate a unique hash
+ * // 3. Check for duplicates
+ * // 4. Log to console if new
+ * // 5. Schedule cleanup after 3 seconds
  * ```
  *
  * **Current Implementation (Milestone 1.2):**
- * - Basic error processing and deduplication
- * - Hash-based error identification
+ * - Basic error processing with sampling and deduplication
+ * - Console output using queueMicrotask for non-blocking behavior
  * - Memory-efficient deduplication with automatic cleanup
- * - Placeholder for transport layer (Step 1.4 will add console logging)
+ * - Configuration-driven sampling rates
  *
- * **Future Implementation (Milestone 1.5+):**
+ * **Future Enhancements (Milestone 1.4+):**
  * - Transport layer integration (HTTP, WebSocket, etc.)
+ * - Advanced sampling strategies
  * - Error categorization and filtering
  * - Performance metrics collection
  * - Breadcrumb correlation
- * - Advanced deduplication strategies
  *
  * @throws {never} This function is designed to never throw errors
  * @since 0.1.0
@@ -139,34 +177,58 @@ function shouldSample(cfg: WatcherConfig): boolean {
  */
 export function processError(p: ErrorPayload) {
   try {
-    // Retrieve the current configuration for error processing
-    const config = getConfig(); // e.g. { environment: 'production', sampleRate: 0.1, maxBreadcrumbs: 50 }
+    // Step 1: Retrieve current SDK configuration
+    // This provides access to sampling rates, environment, and other settings
+    const config = getConfig();
 
-    // If the current configuration does not meet the sampling criteria,
-    // exit early to avoid unnecessary processing of this error.
-    if (!shouldSample(config)) return; // e.g. if returns false, exit early, do not process this error
+    // Step 2: Apply sampling if configured
+    // Skip processing if this error doesn't meet sampling criteria
+    if (!shouldSample(config)) {
+      return; // Early exit for sampled-out errors
+    }
 
-    // Generate unique hash from error details for deduplication
+    // Step 3: Generate unique hash for deduplication
     // Combine message, name, and stack trace for comprehensive identification
+    // Filter out undefined values to ensure consistent hashing
     const key: string = simpleHash(
       [p.message, p.name, p.stack].filter(Boolean).join('|'),
     );
 
-    // Skip processing if this error was recently handled
-    if (recent.has(key)) return; // e.g. if returns true, exit early, do not process this error
+    // Step 4: Check for duplicate errors
+    // Skip if this exact error was recently processed
+    if (recent.has(key)) {
+      return; // Early exit for duplicate errors
+    }
 
-    // Add to recent set for future deduplication
-    recent.add(key); // e.g. add the hash to the recent set
+    // Step 5: Add to recent set for future deduplication
+    // This prevents the same error from being processed multiple times
+    recent.add(key);
 
-    // Schedule removal of this hash after deduplication window
-    // This prevents memory leaks while maintaining deduplication effectiveness
-    setTimeout(() => recent.delete(key), dedupeMs); // e.g. remove the hash from the recent set after 3 seconds
+    // Step 6: Schedule memory cleanup
+    // Remove hash after deduplication window to prevent memory leaks
+    setTimeout(() => {
+      recent.delete(key);
+    }, dedupeMs);
 
-    // For Milestone 1 we just print (non-blocking)
+    // Step 7: Output error information (non-blocking)
+    // Use queueMicrotask to ensure console logging doesn't block the main thread
+    // This is important for maintaining application performance
     queueMicrotask(() => {
-      console.log('[Watcher]', p); // e.g. print the error payload to the console
+      console.log('[Watcher] Error Processed:', {
+        type: p.type,
+        name: p.name,
+        message: p.message,
+        timestamp: p.timestamp,
+        environment: p.environment,
+        // Additional context for debugging
+        source: p.source,
+        position: p.position,
+        url: p.url,
+        route: p.route
+      });
     });
-  } catch {
+
+  } catch (processingError) {
     /**
      * Error processing should never throw
      *
@@ -174,8 +236,17 @@ export function processError(p: ErrorPayload) {
      * it doesn't crash the application. This is critical for an error
      * tracking SDK - it must be resilient to its own failures.
      *
-     * In production, you might want to log these internal errors
-     * to a separate monitoring system for debugging.
+     * **What happens here:**
+     * - Any errors in the processing pipeline are caught
+     * - The error is silently handled to prevent crashes
+     * - The original error is not processed (fail-safe behavior)
+     * - Application continues running normally
+     *
+     * **In production environments, you might want to:**
+     * - Log these internal errors to a separate monitoring system
+     * - Send alerts to development team
+     * - Track SDK health metrics
+     * - Implement circuit breaker patterns
      */
   }
 }
