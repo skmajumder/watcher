@@ -26,38 +26,38 @@
  * - Environment-specific formatting
  */
 
-import { ErrorPayload } from '../types/types';
+import type { ErrorPayload } from '../types/types';
 
 /**
  * Console transport function for error reporting
- * 
+ *
  * This function takes an ErrorPayload and outputs it to the console
  * in a readable format. It's designed to be simple and effective
  * for development and debugging purposes.
- * 
+ *
  * **Output Format:**
  * The function prefixes all output with '[Watcher]:' to clearly
  * identify Watcher SDK error reports in the console.
- * 
+ *
  * **Use Cases:**
  * - Development environment error tracking
  * - Testing error processing pipeline
  * - Local debugging and troubleshooting
  * - Fallback when other transports fail
- * 
+ *
  * **Integration:**
  * This transport can be used as:
  * - Primary transport for development
  * - Fallback transport for production
  * - Testing transport for error processing
  * - Debug transport for troubleshooting
- * 
+ *
  * @param {ErrorPayload} p - The error payload to transport
- * 
+ *
  * @example
  * ```typescript
  * import { consoleTransport } from 'watcher';
- * 
+ *
  * // Transport an error to console
  * consoleTransport({
  *   type: 'runtime_error',
@@ -67,18 +67,18 @@ import { ErrorPayload } from '../types/types';
  *   timestamp: new Date().toISOString(),
  *   environment: 'development'
  * });
- * 
+ *
  * // Console output:
  * // [Watcher]: { type: 'runtime_error', name: 'TypeError', ... }
  * ```
- * 
+ *
  * **Console Output Benefits:**
  * - Immediate visibility of errors
  * - No network dependencies
  * - Easy debugging and inspection
  * - Consistent with development workflow
  * - No external service requirements
- * 
+ *
  * @since 0.1.0
  * @version Milestone 1.2
  */

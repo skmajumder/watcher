@@ -154,3 +154,91 @@ export const simpleHash = (input: string): string => {
   }
   return (hash >>> 0).toString(16);
 };
+
+/**
+ * Checks if a value is Error-like (has 'name' and 'message' string properties).
+ *
+ * @param {unknown} err - The value to check.
+ * @returns {err is Error} True if the value is Error-like, false otherwise.
+ */
+export const isErrorLike = (err: unknown): err is Error => {
+  if (!err || typeof err !== 'object') return false;
+  const maybeError = err as {
+    name?: unknown;
+    message?: unknown;
+    stack?: unknown;
+  };
+  return (
+    typeof maybeError.name === 'string' &&
+    typeof maybeError.message === 'string' &&
+    typeof maybeError.stack === 'string'
+  );
+};
+
+/**
+ * Type guard for string values.
+ *
+ * @param {unknown} str - The value to check.
+ * @returns {str is string} True if the value is a string, false otherwise.
+ */
+export const isString = (str: unknown): str is string =>
+  typeof str === 'string';
+
+/**
+ * Type guard for number values.
+ *
+ * @param {unknown} num - The value to check.
+ * @returns {num is number} True if the value is a number, false otherwise.
+ */
+export const isNumber = (num: unknown): num is number =>
+  typeof num === 'number';
+
+/**
+ * Type guard for boolean values.
+ *
+ * @param {unknown} bool - The value to check.
+ * @returns {bool is boolean} True if the value is a boolean, false otherwise.
+ */
+export const isBoolean = (bool: unknown): bool is boolean =>
+  typeof bool === 'boolean';
+
+/**
+ * Type guard for plain object values (excluding null).
+ *
+ * @param {unknown} obj - The value to check.
+ * @returns {obj is Record<string, unknown>} True if the value is a non-null object, false otherwise.
+ */
+export const isObject = (obj: unknown): obj is Record<string, unknown> =>
+  typeof obj === 'object' && obj !== null;
+
+/**
+ * Type guard for function values.
+ *
+ * @param {unknown} func - The value to check.
+ * @returns {func is (...args: unknown[]) => unknown} True if the value is a function, false otherwise.
+ */
+export const isFunction = (
+  func: unknown,
+): func is (...args: unknown[]) => unknown => typeof func === 'function';
+
+/**
+ * Type guard for array values.
+ *
+ * @param {unknown} arr - The value to check.
+ * @returns {arr is unknown[]} True if the value is an array, false otherwise.
+ */
+export const isArray = (arr: unknown): arr is unknown[] => Array.isArray(arr);
+
+/**
+ * Safely serializes a value to JSON.
+ *
+ * @param {unknown} v - The value to serialize.
+ * @returns {string | undefined} The JSON string if serialization succeeds, otherwise undefined.
+ */
+export function safeJson(v: unknown): string | undefined {
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return undefined;
+  }
+}

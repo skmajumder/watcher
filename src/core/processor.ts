@@ -19,9 +19,16 @@
  * 4. Deduplication: Check if error was recently processed
  * 5. Memory Management: Schedule hash cleanup
  * 6. Error Output: Log to console (non-blocking)
+ *
+ * **Current Implementation Status:**
+ * - ✅ Error sampling with configurable rates
+ * - ✅ Hash-based deduplication with memory management
+ * - ✅ Console output using queueMicrotask
+ * - ✅ Configuration-driven processing
+ * - 🔄 Transport layer integration (planned for Milestone 1.4)
  */
 
-import { ErrorPayload, WatcherConfig } from '../types/types';
+import type { ErrorPayload, WatcherConfig } from '../types/types';
 import { simpleHash } from '../utils';
 import { getConfig } from './config';
 
@@ -36,6 +43,7 @@ import { getConfig } from './config';
  * - Hashes are automatically removed after dedupeMs milliseconds
  * - Prevents memory leaks while maintaining deduplication effectiveness
  * - Uses setTimeout for cleanup scheduling
+ * - Maximum memory usage is bounded by error frequency and dedupeMs
  *
  * @private
  * @type {Set<string>}
@@ -59,6 +67,7 @@ const recent: Set<string> = new Set<string>();
  * - Shorter windows: Less memory, more error reports
  * - Longer windows: More memory, fewer duplicate reports
  * - 3 seconds is optimal for most web applications
+ * - Can be made configurable in future versions
  *
  * @private
  * @type {number}
@@ -85,6 +94,12 @@ const dedupeMs: number = 3000;
  * - Production: sampleRate = 0.1 (10% of errors)
  * - High-traffic: sampleRate = 0.01 (1% of errors)
  *
+ * **Future Improvements:**
+ * - Deterministic sampling based on error hash
+ * - Time-based sampling windows
+ * - Error type-specific sampling rates
+ * - Adaptive sampling based on error frequency
+ *
  * @param {WatcherConfig} cfg - The Watcher configuration object
  * @returns {boolean} True if the error should be processed, false to skip
  *
@@ -93,22 +108,19 @@ const dedupeMs: number = 3000;
  * // Process 10% of errors in production
  * const config = { sampleRate: 0.1 };
  * const shouldProcess = shouldSample(config);
- * 
+ *
  * // Process all errors in development
  * const devConfig = { sampleRate: 1.0 };
  * const devShouldProcess = shouldSample(devConfig);
  * ```
  *
  * @note This is a simple random sampling strategy. Future versions may
- * implement more sophisticated sampling algorithms like:
- * - Deterministic sampling based on error hash
- * - Time-based sampling windows
- * - Error type-specific sampling rates
+ * implement more sophisticated sampling algorithms for better error coverage.
  */
 function shouldSample(cfg: WatcherConfig): boolean {
   // Get sample rate from config, default to 1.0 (100%) if not specified
   const sampleRate = cfg?.sampleRate ?? 1;
-  
+
   // Simple random sampling: return true if random value is less than sample rate
   return Math.random() < sampleRate;
 }
@@ -133,6 +145,12 @@ function shouldSample(cfg: WatcherConfig): boolean {
  * - Graceful degradation if any step fails
  * - Never throws errors to calling code
  * - Maintains application stability
+ *
+ * **Performance Characteristics:**
+ * - Early returns for sampled-out and duplicate errors
+ * - Non-blocking console output using queueMicrotask
+ * - Memory-efficient deduplication with automatic cleanup
+ * - Minimal impact on application performance
  *
  * @param {ErrorPayload} p - The error payload to process
  *
@@ -159,10 +177,11 @@ function shouldSample(cfg: WatcherConfig): boolean {
  * ```
  *
  * **Current Implementation (Milestone 1.2):**
- * - Basic error processing with sampling and deduplication
- * - Console output using queueMicrotask for non-blocking behavior
- * - Memory-efficient deduplication with automatic cleanup
- * - Configuration-driven sampling rates
+ * - ✅ Basic error processing with sampling and deduplication
+ * - ✅ Console output using queueMicrotask for non-blocking behavior
+ * - ✅ Memory-efficient deduplication with automatic cleanup
+ * - ✅ Configuration-driven sampling rates
+ * - 🔄 Transport layer integration (planned for Milestone 1.4)
  *
  * **Future Enhancements (Milestone 1.4+):**
  * - Transport layer integration (HTTP, WebSocket, etc.)
@@ -170,6 +189,7 @@ function shouldSample(cfg: WatcherConfig): boolean {
  * - Error categorization and filtering
  * - Performance metrics collection
  * - Breadcrumb correlation
+ * - Error grouping and aggregation
  *
  * @throws {never} This function is designed to never throw errors
  * @since 0.1.0
@@ -183,9 +203,7 @@ export function processError(p: ErrorPayload) {
 
     // Step 2: Apply sampling if configured
     // Skip processing if this error doesn't meet sampling criteria
-    if (!shouldSample(config)) {
-      return; // Early exit for sampled-out errors
-    }
+    if (!shouldSample(config)) return; // Early exit for sampled-out errors
 
     // Step 3: Generate unique hash for deduplication
     // Combine message, name, and stack trace for comprehensive identification
@@ -214,18 +232,7 @@ export function processError(p: ErrorPayload) {
     // Use queueMicrotask to ensure console logging doesn't block the main thread
     // This is important for maintaining application performance
     queueMicrotask(() => {
-      console.log('[Watcher] Error Processed:', {
-        type: p.type,
-        name: p.name,
-        message: p.message,
-        timestamp: p.timestamp,
-        environment: p.environment,
-        // Additional context for debugging
-        source: p.source,
-        position: p.position,
-        url: p.url,
-        route: p.route
-      });
+      console.log('[Watcher] Error Processed:', p);
     });
 
   } catch (processingError) {
@@ -247,6 +254,7 @@ export function processError(p: ErrorPayload) {
      * - Send alerts to development team
      * - Track SDK health metrics
      * - Implement circuit breaker patterns
+     * - Monitor error processing success rates
      */
   }
 }
