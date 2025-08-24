@@ -6,6 +6,9 @@
   "author": "SK Majumder",
   "license": "MIT",
   "private": false,
+  "engines": {
+    "node": ">=18"
+  },
   "keywords": [
     "error",
     "tracking",
@@ -29,12 +32,21 @@
     "README.md",
     "LICENSE"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/skmajumder/watcher.git"
+  },
+  "bugs": {
+    "url": "https://github.com/skmajumder/watcher/issues"
+  },
+  "homepage": "https://github.com/skmajumder/watcher#readme",
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest"
+    "test": "vitest --run",
+    "prepublishOnly": "npm run lint && npm run typecheck && npm run build"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
