@@ -56,8 +56,9 @@ export const isServer = (): boolean => !isBrowser();
  * Determines if the code is running in a Node.js environment
  *
  * This function checks for the presence of the Node.js process object
- * and its version information to identify Node.js runtime environments.
+ * to identify Node.js runtime environments.
  *
+ * @returns {boolean} True if running in Node.js, false otherwise
  *
  * @example
  * ```typescript
@@ -69,9 +70,10 @@ export const isServer = (): boolean => !isBrowser();
  *   console.log('Platform:', os.platform());
  * }
  * ```
+ * @since 0.1.0
+ * @version Milestone 1.2
  */
-export const isNode = (): string | false =>
-  typeof process !== 'undefined' && process.versions?.node;
+export const isNode = (): boolean => typeof process !== 'undefined';
 
 /**
  * Determines if the code is running in a Web Worker context

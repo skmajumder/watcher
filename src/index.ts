@@ -3,7 +3,7 @@
  *
  * This is the primary entry point for the Watcher SDK, a high-performance
  * error tracking solution designed specifically for Next.js and React applications.
- * 
+ *
  * The SDK automatically detects the runtime environment (browser vs server)
  * and adapts its error handling strategies accordingly. It provides:
  * - Real-time error monitoring and categorization
@@ -24,7 +24,7 @@
  * // Basic initialization
  * import { initWatcher } from 'watcher';
  * initWatcher();
- * 
+ *
  * // Advanced configuration
  * import { initWatcher } from 'watcher';
  * initWatcher({
@@ -39,14 +39,15 @@ import { defaultConfig } from './config/defaults';
 import { setConfig } from './core/config';
 import { installGlobalHandlers } from './handlers/global';
 import { WatcherConfig, WatcherEnv } from './types/types';
+import { isNode } from './utils';
 
 /**
  * Initialization state flag
- * 
+ *
  * This boolean flag prevents multiple initializations of the SDK.
  * Once set to true, subsequent calls to initWatcher() will return early.
  * This ensures the SDK is only initialized once per application lifecycle.
- * 
+ *
  * @private
  * @type {boolean}
  */
@@ -79,7 +80,7 @@ let didInit: boolean = false;
  * - **Fallback**: Defaults to 'production' for safety
  *
  * @param {WatcherConfig} userConfig - Optional user configuration object
- * 
+ *
  * @example
  * ```typescript
  * // Development environment with full error collection
@@ -88,21 +89,21 @@ let didInit: boolean = false;
  *   sampleRate: 1.0,           // Collect all errors
  *   maxBreadcrumbs: 100        // Store many breadcrumbs for debugging
  * });
- * 
+ *
  * // Production environment with sampling for performance
  * initWatcher({
  *   environment: 'production',
  *   sampleRate: 0.1,           // Collect 10% of errors
  *   maxBreadcrumbs: 20         // Minimal breadcrumbs to save memory
  * });
- * 
+ *
  * // Test environment with minimal overhead
  * initWatcher({
  *   environment: 'test',
  *   sampleRate: 0.01,          // Collect 1% of errors
  *   maxBreadcrumbs: 5          // Very few breadcrumbs
  * });
- * 
+ *
  * // Automatic environment detection (recommended)
  * initWatcher(); // Uses NODE_ENV or defaults to 'production'
  * ```
@@ -135,36 +136,34 @@ export function initWatcher(userConfig: WatcherConfig = {} as WatcherConfig) {
     // Environment: user config > NODE_ENV > fallback to 'production'
     environment:
       userConfig.environment ??
-      (typeof process !== 'undefined'
-        ? (process.env.NODE_ENV as WatcherEnv)
-        : 'production'),
-    
+      (isNode() ? (process.env.NODE_ENV as WatcherEnv) : 'production'),
+
     // Sampling rate: user config > default (1.0 = 100%)
     sampleRate: userConfig.sampleRate ?? defaultConfig.sampleRate,
-    
+
     // Max breadcrumbs: user config > default (20)
     maxBreadcrumbs: userConfig.maxBreadcrumbs ?? defaultConfig.maxBreadcrumbs,
   };
-  
+
   // Store merged configuration in global singleton
   setConfig(cfg);
-  
+
   // Install environment-specific error handlers
   // Note: Currently placeholder, becomes real in Step 1.4
   installGlobalHandlers(cfg);
-  
+
   // Log successful initialization
   console.log('[watcher] initialized');
 }
 
 /**
  * Re-exports all types from the types module
- * 
+ *
  * This allows users to import types directly from the main package:
  * ```typescript
  * import { WatcherConfig, ErrorPayload, WatcherEnv } from 'watcher';
  * ```
- * 
+ *
  * Available types include:
  * - WatcherConfig: SDK configuration interface
  * - ErrorPayload: Error data structure
