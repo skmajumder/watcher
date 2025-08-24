@@ -28,7 +28,7 @@
  * - 🔄 Transport layer integration (planned for Milestone 1.4)
  */
 
-import { ErrorPayload, WatcherConfig } from '../types/types';
+import type { ErrorPayload, WatcherConfig } from '../types/types';
 import { simpleHash } from '../utils';
 import { getConfig } from './config';
 

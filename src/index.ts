@@ -46,7 +46,7 @@
 import { defaultConfig } from './config/defaults';
 import { setConfig } from './core/config';
 import { installGlobalHandlers } from './handlers/global';
-import { WatcherConfig, WatcherEnv } from './types/types';
+import type { WatcherConfig, WatcherEnv } from './types/types';
 import { isNode } from './utils';
 
 /**
