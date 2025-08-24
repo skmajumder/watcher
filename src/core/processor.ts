@@ -93,7 +93,7 @@ const dedupeMs: number = 3000;
  * // Process 10% of errors in production
  * const config = { sampleRate: 0.1 };
  * const shouldProcess = shouldSample(config);
- * 
+ *
  * // Process all errors in development
  * const devConfig = { sampleRate: 1.0 };
  * const devShouldProcess = shouldSample(devConfig);
@@ -108,7 +108,7 @@ const dedupeMs: number = 3000;
 function shouldSample(cfg: WatcherConfig): boolean {
   // Get sample rate from config, default to 1.0 (100%) if not specified
   const sampleRate = cfg?.sampleRate ?? 1;
-  
+
   // Simple random sampling: return true if random value is less than sample rate
   return Math.random() < sampleRate;
 }
@@ -183,9 +183,7 @@ export function processError(p: ErrorPayload) {
 
     // Step 2: Apply sampling if configured
     // Skip processing if this error doesn't meet sampling criteria
-    if (!shouldSample(config)) {
-      return; // Early exit for sampled-out errors
-    }
+    if (!shouldSample(config)) return; // Early exit for sampled-out errors
 
     // Step 3: Generate unique hash for deduplication
     // Combine message, name, and stack trace for comprehensive identification
@@ -214,20 +212,8 @@ export function processError(p: ErrorPayload) {
     // Use queueMicrotask to ensure console logging doesn't block the main thread
     // This is important for maintaining application performance
     queueMicrotask(() => {
-      console.log('[Watcher] Error Processed:', {
-        type: p.type,
-        name: p.name,
-        message: p.message,
-        timestamp: p.timestamp,
-        environment: p.environment,
-        // Additional context for debugging
-        source: p.source,
-        position: p.position,
-        url: p.url,
-        route: p.route
-      });
+      console.log('[Watcher] Error Processed:', p);
     });
-
   } catch (processingError) {
     /**
      * Error processing should never throw

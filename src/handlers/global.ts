@@ -24,8 +24,9 @@
  * error coverage across the entire application.
  */
 
+import { normalizeThrowable } from '../core/normalize';
 import { processError } from '../core/processor';
-import { ErrorPayload, WatcherConfig } from '../types/types';
+import type { ErrorPayload, WatcherConfig } from '../types/types';
 import { isBrowser, nowIso } from '../utils';
 
 /**
@@ -80,7 +81,7 @@ let installed: boolean = false;
  * 5. Send to error processor for deduplication and sampling
  * 6. Forward to transport layer for reporting
  *
- * @param {WatcherConfig} _config - Configuration object for error handling
+ * @param {WatcherConfig} config - Configuration object for error handling
  *
  * @example
  * ```typescript
@@ -116,7 +117,7 @@ let installed: boolean = false;
  * @since 0.1.0
  * @version Milestone 1.2 (fully implemented)
  */
-export function installGlobalHandlers(_config: WatcherConfig): void {
+export function installGlobalHandlers(config: WatcherConfig): void {
   // Prevent multiple installations to avoid duplicate handlers
   if (installed) return;
 
@@ -126,6 +127,9 @@ export function installGlobalHandlers(_config: WatcherConfig): void {
   // Only install handlers in browser environments
   // Server-side error handling is handled separately
   if (!isBrowser()) return;
+
+  const prevOnError = window.onerror;
+  const prevOnRejection = window.onunhandledrejection;
 
   /**
    * Global error handler for synchronous JavaScript errors
@@ -147,24 +151,29 @@ export function installGlobalHandlers(_config: WatcherConfig): void {
    * - colno: Column number where error occurred
    * - error: Error object with stack trace
    */
-  window.onerror = (message, source, lineno, colno, error): boolean => {
+  window.onerror = function (
+    message: string | Event,
+    source?: string,
+    lineno?: number,
+    colno?: number,
+    error?: Error,
+  ): boolean {
     try {
+      const base = baseFields(config);
+      const norm = normalizeThrowable(error ?? message);
+
       // Create standardized error payload from browser error information
       const payload: ErrorPayload = {
         type: 'runtime_error',
-        name: error?.name, // Error constructor name
-        message: String(message), // Convert to string for consistency
-        stack: error?.stack, // Full stack trace if available
+        name: norm.name, // Error constructor name
+        message: norm.message ?? String(message), // Convert to string for consistency
+        stack: norm.stack, // Full stack trace if available
         source, // Source file URL
         position:
-          lineno !== null && colno !== null
-            ? `line: ${lineno}, col: ${colno}` // Precise position information
+          lineno !== undefined && colno !== undefined
+            ? `${lineno}:${colno}` // Precise position information
             : undefined,
-        url: window.location.href, // Current page URL
-        route: window.location.pathname, // Current route/path
-        userAgent: navigator?.userAgent, // Browser identification
-        environment: _config.environment, // Environment from config
-        timestamp: nowIso(), // ISO timestamp
+        ...base,
       };
 
       // Send to error processor for deduplication and sampling
@@ -177,6 +186,12 @@ export function installGlobalHandlers(_config: WatcherConfig): void {
        * to prevent the application from crashing. This is critical
        * for maintaining application stability.
        */
+    }
+
+    if (typeof prevOnError === 'function') {
+      try {
+        return prevOnError.apply(this, arguments as any);
+      } catch {}
     }
 
     // Return false to allow browser's default error handling
@@ -204,23 +219,20 @@ export function installGlobalHandlers(_config: WatcherConfig): void {
    * - A string message
    * - Any other value passed to Promise.reject()
    */
-  window.onunhandledrejection = (event: PromiseRejectionEvent): void => {
+  window.onunhandledrejection = function (event: PromiseRejectionEvent): void {
     try {
       // Extract rejection reason from the event
-      const reason: any = event.reason;
+      const base = baseFields(config);
+      const reason: unknown = (event as PromiseRejectionEvent)?.reason ?? event;
+      const norm = normalizeThrowable(reason);
 
       // Create standardized error payload
       const payload: ErrorPayload = {
         type: 'unhandled_promise',
-        name: reason?.name, // Error constructor name if available
-        message:
-          reason?.message ?? (typeof reason === 'string' ? reason : undefined),
-        stack: reason?.stack, // Stack trace if available
-        url: window.location.href, // Current page URL
-        route: window.location.pathname, // Current route/path
-        userAgent: navigator?.userAgent, // Browser identification
-        environment: _config.environment, // Environment from config
-        timestamp: nowIso(), // ISO timestamp
+        name: norm.name, // Error constructor name if available
+        message: norm.message,
+        stack: norm.stack, // Stack trace if available
+        ...base,
       };
 
       // Send to error processor for deduplication and sampling
@@ -234,5 +246,32 @@ export function installGlobalHandlers(_config: WatcherConfig): void {
        * the stability of the error handling system.
        */
     }
+
+    if (typeof prevOnRejection === 'function') {
+      try {
+        // @ts-expect-error preserve original signature
+        prevOnRejection.apply(this, arguments as any);
+      } catch {}
+    }
+  };
+}
+
+function baseFields(config: WatcherConfig) {
+  const now = nowIso();
+  if (typeof window === 'undefined') {
+    return {
+      environment: config.environment,
+      timestamp: now,
+      url: undefined,
+      route: undefined,
+      userAgent: undefined,
+    };
+  }
+  return {
+    environment: config.environment,
+    timestamp: now,
+    url: window.location.href,
+    route: window.location.pathname,
+    userAgent: navigator.userAgent,
   };
 }

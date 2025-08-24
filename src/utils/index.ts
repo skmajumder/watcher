@@ -154,3 +154,49 @@ export const simpleHash = (input: string): string => {
   }
   return (hash >>> 0).toString(16);
 };
+
+/**
+ * Checks if a value is Error-like (has 'name' and 'message' string properties).
+ *
+ * @param {unknown} err - The value to check.
+ * @returns {err is Error} True if the value is Error-like, false otherwise.
+ */
+export const isErrorLike = (err: unknown): err is Error => {
+  if (!err || typeof err !== 'object') return false;
+  const maybeError = err as {
+    name?: unknown;
+    message?: unknown;
+    stack?: unknown;
+  };
+  return (
+    typeof maybeError.name === 'string' &&
+    typeof maybeError.message === 'string' &&
+    typeof maybeError.stack === 'string'
+  );
+};
+
+export const isString = (str: unknown): str is string =>
+  typeof str === 'string';
+
+export const isNumber = (num: unknown): num is number =>
+  typeof num === 'number';
+
+export const isBoolean = (bool: unknown): bool is boolean =>
+  typeof bool === 'boolean';
+
+export const isObject = (obj: unknown): obj is Record<string, unknown> =>
+  typeof obj === 'object' && obj !== null;
+
+export const isFunction = (
+  func: unknown,
+): func is (...args: unknown[]) => unknown => typeof func === 'function';
+
+export const isArray = (arr: unknown): arr is unknown[] => Array.isArray(arr);
+
+export function safeJson(v: unknown): string | undefined {
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return undefined;
+  }
+}
