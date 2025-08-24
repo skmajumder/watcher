@@ -33,7 +33,7 @@ import { isBrowser, nowIso } from '../utils';
  *
  * This flag prevents multiple installations of global handlers
  * to avoid duplicate event listeners and potential memory leaks.
- * 
+ *
  * **Why this is important:**
  * - Prevents duplicate error processing
  * - Avoids memory leaks from multiple listeners
@@ -93,12 +93,11 @@ let installed: boolean = false;
  *   maxBreadcrumbs: 20
  * });
  *
- * // After installation, all unhandled errors will be automatically captured:
- * // - Runtime errors (TypeError, ReferenceError, etc.)
- * // - Unhandled promise rejections
- * // - Syntax errors (in some browsers)
- * // - Network errors (in some cases)
- * ```
+ * **After installation, all unhandled errors will be automatically captured:**
+ * - Runtime errors (TypeError, ReferenceError, etc.)
+ * - Unhandled promise rejections
+ * - Syntax errors (in some browsers)
+ * - Network errors (in some cases)
  *
  * **Browser Compatibility:**
  * - **window.onerror**: Supported in all modern browsers
@@ -117,7 +116,7 @@ let installed: boolean = false;
  * @since 0.1.0
  * @version Milestone 1.2 (fully implemented)
  */
-export function installGlobalHandlers(_config: WatcherConfig) {
+export function installGlobalHandlers(_config: WatcherConfig): void {
   // Prevent multiple installations to avoid duplicate handlers
   if (installed) return;
 
@@ -148,23 +147,24 @@ export function installGlobalHandlers(_config: WatcherConfig) {
    * - colno: Column number where error occurred
    * - error: Error object with stack trace
    */
-  window.onerror = (message, source, lineno, colno, error) => {
+  window.onerror = (message, source, lineno, colno, error): boolean => {
     try {
       // Create standardized error payload from browser error information
       const payload: ErrorPayload = {
         type: 'runtime_error',
-        name: error?.name,                    // Error constructor name
-        message: String(message),             // Convert to string for consistency
-        stack: error?.stack,                  // Full stack trace if available
-        source,                               // Source file URL
-        position: lineno !== null && colno !== null
-          ? `line: ${lineno}, col: ${colno}`  // Precise position information
-          : undefined,
-        url: window.location.href,            // Current page URL
-        route: window.location.pathname,      // Current route/path
-        userAgent: navigator?.userAgent,      // Browser identification
-        environment: _config.environment,     // Environment from config
-        timestamp: nowIso(),                  // ISO timestamp
+        name: error?.name, // Error constructor name
+        message: String(message), // Convert to string for consistency
+        stack: error?.stack, // Full stack trace if available
+        source, // Source file URL
+        position:
+          lineno !== null && colno !== null
+            ? `line: ${lineno}, col: ${colno}` // Precise position information
+            : undefined,
+        url: window.location.href, // Current page URL
+        route: window.location.pathname, // Current route/path
+        userAgent: navigator?.userAgent, // Browser identification
+        environment: _config.environment, // Environment from config
+        timestamp: nowIso(), // ISO timestamp
       };
 
       // Send to error processor for deduplication and sampling
@@ -204,22 +204,23 @@ export function installGlobalHandlers(_config: WatcherConfig) {
    * - A string message
    * - Any other value passed to Promise.reject()
    */
-  window.addEventListener('unhandledrejection', (event) => {
+  window.onunhandledrejection = (event: PromiseRejectionEvent): void => {
     try {
       // Extract rejection reason from the event
       const reason: any = event.reason;
-      
+
       // Create standardized error payload
       const payload: ErrorPayload = {
         type: 'unhandled_promise',
-        name: reason?.name,                   // Error constructor name if available
-        message: reason?.message ?? (typeof reason === 'string' ? reason : undefined),
-        stack: reason?.stack,                 // Stack trace if available
-        url: window.location.href,            // Current page URL
-        route: window.location.pathname,      // Current route/path
-        userAgent: navigator?.userAgent,      // Browser identification
-        environment: _config.environment,     // Environment from config
-        timestamp: nowIso(),                  // ISO timestamp
+        name: reason?.name, // Error constructor name if available
+        message:
+          reason?.message ?? (typeof reason === 'string' ? reason : undefined),
+        stack: reason?.stack, // Stack trace if available
+        url: window.location.href, // Current page URL
+        route: window.location.pathname, // Current route/path
+        userAgent: navigator?.userAgent, // Browser identification
+        environment: _config.environment, // Environment from config
+        timestamp: nowIso(), // ISO timestamp
       };
 
       // Send to error processor for deduplication and sampling
@@ -233,5 +234,5 @@ export function installGlobalHandlers(_config: WatcherConfig) {
        * the stability of the error handling system.
        */
     }
-  });
+  };
 }
