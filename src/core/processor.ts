@@ -29,8 +29,11 @@
  */
 
 import type { ErrorPayload, WatcherConfig } from '../types/types';
-import { simpleHash } from '../utils';
+import { simpleHash } from '../utils/hash';
+import { sanitizePayload } from '../utils/sanitize';
 import { getConfig } from './config';
+
+type Fingerprint = string;
 
 /**
  * Set of recently processed error hashes for deduplication
@@ -48,7 +51,12 @@ import { getConfig } from './config';
  * @private
  * @type {Set<string>}
  */
-const recent: Set<string> = new Set<string>();
+const recent: Map<Fingerprint, number> = new Map<Fingerprint, number>(); // key -> expiry ts
+
+const RATE_WINDOW_MS: number = 5_000;
+const RATE_MAX: number = 50; // per window
+let windowStart: number = Date.now();
+let countInWindow: number = 0;
 
 /**
  * Deduplication time window in milliseconds
@@ -125,6 +133,50 @@ function shouldSample(cfg: WatcherConfig): boolean {
   return Math.random() < sampleRate;
 }
 
+function fingerprint(p: ErrorPayload): Fingerprint {
+  // Normalize to reduce noisy differences: trim/strip whitespace
+  const name = (p?.name || '').trim();
+  const msg = (p?.message || '').replace(/\s+/g, '').trim();
+  const stack = (p?.stack || '').replace(/\s+/g, '').trim();
+  const src = (p?.source || '').trim();
+
+  // Combine with separator to create a unique fingerprint
+  return simpleHash([p.type, name, msg, stack, src].join('|'));
+}
+
+function deduped(key: Fingerprint, ttl = 3_000): boolean {
+  // Current timestamp
+  const now = Date.now();
+  // lookup this fingerprint's stamp
+  const expiry = recent.get(key);
+
+  // If the clipboard (Map) is big, purge any expired stamps
+  if (recent.size > 500) {
+    for (const [key, exp] of recent) {
+      if (exp <= now) recent.delete(key);
+    }
+  }
+
+  // stamp still valid → DUPLICATE
+  if (expiry && expiry > now) return true;
+  // first time (or stamp expired) → issue new stamp
+  recent.set(key, now + ttl);
+  // NOT duplicate (let it through)
+  return false;
+}
+
+function rateLimited(): boolean {
+  // Current timestamp
+  const now = Date.now();
+
+  if (now - windowStart > RATE_WINDOW_MS) {
+    windowStart = now;
+    countInWindow = 0;
+  }
+  countInWindow++;
+  return countInWindow > RATE_MAX;
+}
+
 /**
  * Processes incoming error payloads with comprehensive error handling
  *
@@ -152,7 +204,7 @@ function shouldSample(cfg: WatcherConfig): boolean {
  * - Memory-efficient deduplication with automatic cleanup
  * - Minimal impact on application performance
  *
- * @param {ErrorPayload} p - The error payload to process
+ * @param {ErrorPayload} raw - The error payload to process
  *
  * @example
  * ```typescript
@@ -195,7 +247,7 @@ function shouldSample(cfg: WatcherConfig): boolean {
  * @since 0.1.0
  * @version Milestone 1.2
  */
-export function processError(p: ErrorPayload) {
+export function processError(raw: ErrorPayload) {
   try {
     // Step 1: Retrieve current SDK configuration
     // This provides access to sampling rates, environment, and other settings
@@ -203,38 +255,21 @@ export function processError(p: ErrorPayload) {
 
     // Step 2: Apply sampling if configured
     // Skip processing if this error doesn't meet sampling criteria
-    if (!shouldSample(config)) return; // Early exit for sampled-out errors
+    if (!shouldSample(config)) return;
+    if (rateLimited()) return;
 
-    // Step 3: Generate unique hash for deduplication
-    // Combine message, name, and stack trace for comprehensive identification
-    // Filter out undefined values to ensure consistent hashing
-    const key: string = simpleHash(
-      [p.message, p.name, p.stack].filter(Boolean).join('|'),
-    );
+    const sanitized = sanitizePayload(raw);
+    const key = fingerprint(sanitized);
 
-    // Step 4: Check for duplicate errors
-    // Skip if this exact error was recently processed
-    if (recent.has(key)) {
-      return; // Early exit for duplicate errors
-    }
+    if (deduped(key)) return;
 
-    // Step 5: Add to recent set for future deduplication
-    // This prevents the same error from being processed multiple times
-    recent.add(key);
+    // Attach fingerprint so later transports can correlate/dedupe server-side too
+    const payload = { ...sanitized, fingerprint: key };
 
-    // Step 6: Schedule memory cleanup
-    // Remove hash after deduplication window to prevent memory leaks
-    setTimeout(() => {
-      recent.delete(key);
-    }, dedupeMs);
-
-    // Step 7: Output error information (non-blocking)
-    // Use queueMicrotask to ensure console logging doesn't block the main thread
-    // This is important for maintaining application performance
+    // Non-blocking log; real transports will plug in here later
     queueMicrotask(() => {
-      console.log('[Watcher] Error Processed:', p);
+      console.log('[Watcher] Error Processed:', payload);
     });
-
   } catch (processingError) {
     /**
      * Error processing should never throw
