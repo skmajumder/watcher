@@ -67,7 +67,7 @@ export interface ErrorPayload {
   /** Full error stack trace for debugging */
   stack?: string;
   /** Stack trace for React rendering errors */
-  componentStack?: string;
+  componentStack?: string | null;
   /** Source file or component where error occurred */
   source?: string;
   /** Line and column position in the source file (format: "line:col") */
