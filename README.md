@@ -1,57 +1,62 @@
-# Watcher SDK
+# 🕵️ Watcher SDK
 
-A high-performance error tracking SDK designed specifically for Next.js and React applications. The Watcher SDK provides comprehensive error monitoring, breadcrumb tracking, and performance insights to help developers identify and resolve issues quickly.
+A **high-performance error tracking SDK** designed specifically for **Next.js** and **React** applications.  
+Watcher provides **comprehensive error monitoring**, **deduplication**, **rate limiting**, **breadcrumb tracking**, and (soon) **performance insights** — helping developers identify and resolve issues quickly without drowning in noise.
+
+---
 
 ## 🎯 Project Status
 
-### Milestone 1: Foundation Setup ✅
-- **Step 1.1: Project Initialization** ✅ Complete
-- **Step 1.2: Base Folder Structure** ✅ Complete
-- **Step 1.3: Core Error Handling** 🔄 In Progress
-- **Step 1.4: Transport Layer** 📋 Planned
+### ✅ Milestone 1: SDK Bootstrapping + Core Error Capture
+
+- [x] Project Initialization (`npm init`, TypeScript, build setup)
+- [x] Base folder structure (`src/core`, `src/utils`, etc.)
+- [x] `initWatcher()` function with config support
+- [x] Global error capturing (`window.onerror`, `window.onunhandledrejection`)
+- [x] Error processor with **deduplication** + **sampling**
+- [x] Console logging for development
+
+### 🚧 Upcoming
+
+- Milestone 2: React integration (`<WatcherErrorBoundary>`, API wrapping, RTK Query middleware)
+- Milestone 3: Server-side logging (Next.js API routes, SSR/SSG)
+- Milestone 4: Enriched error payloads (route, session, user context)
+- Milestone 5: Reporting to API / S3 storage
+- Milestone 6+: Config files, plugins, templates
+
+---
 
 ## 🏗️ Project Structure
 
-```
-watcher/
-├── src/
-│   ├── client/          # Browser-specific implementations
-│   ├── config/          # Configuration management
-│   │   └── defaults.ts  # Default SDK configuration
-│   ├── core/            # Core error tracking logic
-│   │   └── placeholder.ts # Placeholder for core functionality
-│   ├── handlers/        # Error event handlers
-│   ├── server/          # Server-side implementations
-│   ├── transports/      # Data transmission layer
-│   ├── types/           # TypeScript type definitions
-│   │   └── types.ts     # Core types and interfaces
-│   ├── utils/           # Utility functions
-│   │   └── index.ts     # Environment detection helpers
-│   └── index.ts         # Main SDK entry point
-├── tests/               # Test suite
-├── types/               # Additional type definitions
-└── dist/                # Build output (generated)
+```bash
+src/
+  core/        # Core error capture + processor
+  config/      # Config parsing and defaults
+  utils/       # Helpers (hashing, env detection, etc.)
+  index.ts     # SDK entry point
+types/         # TypeScript types
+watcher.config.ts
 ```
 
 ## 🚀 Features
 
-### Current (Milestone 1.2)
-- ✅ TypeScript project setup with proper configuration
-- ✅ Build system using tsup for ESM/CJS dual output
-- ✅ Comprehensive type definitions for error tracking
-- ✅ Environment detection utilities
-- ✅ Default configuration management
-- ✅ Project structure for future development
+### Current
+
+- ✅ Capture runtime errors via window.onerror
+- ✅ Capture unhandled promise rejections
+- ✅ Error deduplication (fingerprint + TTL)
+- ✅ Error sampling (sampleRate)
+- ✅ Basic rate limiting
+- ✅ Non-blocking logging with queueMicrotask
 
 ### Planned (Future Milestones)
-- 🔄 Real-time error monitoring
-- 🔄 Breadcrumb tracking for user actions
-- 🔄 Automatic error categorization
-- 🔄 Performance monitoring
-- 🔄 React error boundary integration
-- 🔄 Next.js specific optimizations
-- 🔄 Multiple transport backends
-- 🔄 Sampling and rate limiting
+
+- 🔄 React error boundary support
+- 🔄 API + fetch error capture
+- 🔄 RTK Query integration
+- 🔄 Breadcrumbs (user actions, route changes)
+- 🔄 Server-side + Next.js error capture
+- 🔄 Configurable reporting (API, S3, file)
 
 ## 📦 Installation
 
@@ -70,18 +75,36 @@ initWatcher();
 // Initialize with custom configuration
 initWatcher({
   environment: 'production',
-  sampleRate: 0.1,        // Collect 10% of errors
-  maxBreadcrumbs: 50      // Store up to 50 breadcrumbs per error
+  sampleRate: 0.1, // Collect 10% of errors
+  maxBreadcrumbs: 50, // Store up to 50 breadcrumbs per error
 });
+
+// Example: an unhandled error
+function triggerError() {
+  throw new Error('Something went wrong!');
+}
+
+triggerError();
+
+// Watcher will capture:
+// {
+//   type: "runtime_error",
+//   message: "Something went wrong!",
+//   stack: "...",
+//   url: "http://localhost:3000/",
+//   timestamp: "2025-08-24T18:30:00.000Z"
+// }
 ```
 
 ## 🛠️ Development
 
 ### Prerequisites
+
 - Node.js >= 18
 - npm or yarn
 
 ### Setup
+
 ```bash
 # Install dependencies
 npm install
@@ -103,7 +126,9 @@ npm run test
 ```
 
 ### Build Output
+
 The SDK builds to multiple formats:
+
 - **ESM**: `dist/index.js` - Modern ES modules
 - **CommonJS**: `dist/index.cjs` - Node.js compatibility
 - **Types**: `dist/index.d.ts` - TypeScript definitions
@@ -123,17 +148,21 @@ npm run test -- --watch
 ### Core Types
 
 #### `WatcherConfig`
+
 Configuration interface for the SDK:
+
 ```typescript
 interface WatcherConfig {
-  environment: WatcherEnv;        // Required: deployment environment
-  sampleRate?: number;            // Optional: error sampling rate (0.0-1.0)
-  maxBreadcrumbs?: number;        // Optional: max breadcrumbs per error
+  environment: WatcherEnv; // "development" | "production"
+  sampleRate?: number; // Fraction of errors to capture (0.0–1.0)
+  maxBreadcrumbs?: number; // Max breadcrumbs per error
 }
 ```
 
 #### `ErrorKind`
+
 Categories of errors the SDK can track:
+
 - `runtime_error` - General JavaScript errors
 - `unhandled_promise` - Unhandled promise rejections
 - `promise_rejection` - Explicit promise rejections
@@ -142,35 +171,37 @@ Categories of errors the SDK can track:
 - `render_error` - React rendering errors
 
 #### `ErrorPayload`
+
 Complete error information structure:
+
 ```typescript
 interface ErrorPayload {
-  type: ErrorKind;               // Error category
-  name?: string;                 // Error name/constructor
-  message?: string;              // Human-readable message
-  stack?: string;                // Stack trace
-  source?: string;               // Source file/component
-  position?: string;             // Line:column position
-  url?: string;                  // Current URL
-  route?: string;                // Current route
-  userAgent?: string;            // Browser user agent
-  timestamp: string;             // ISO timestamp
-  environment?: WatcherEnv;      // Environment context
-  sessionId?: string;            // User session ID
+  type: ErrorKind;
+  name?: string;
+  message?: string;
+  stack?: string;
+  source?: string;
+  position?: string;
+  url?: string;
+  route?: string;
+  userAgent?: string;
+  timestamp: string;
+  environment?: WatcherEnv;
+  sessionId?: string;
 }
 ```
 
 ### Utility Functions
 
 #### `isBrowser()`
+
 Detects if code is running in browser environment:
+
 ```typescript
 import { isBrowser } from 'watcher';
 
 if (isBrowser()) {
-  // Browser-specific code
-} else {
-  // Server-side code
+  console.log('Running in browser');
 }
 ```
 
@@ -180,11 +211,10 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🤝 Contributing
 
-1. Fork the repository
+1. Fork the repo
 2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+3. Make changes + add tests
+4. Submit a PR 🚀
 
 ## 📞 Support
 
@@ -193,26 +223,35 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🗺️ Roadmap
 
-### Milestone 1: Foundation (Current)
-- [x] Project setup and structure
-- [x] Type definitions
-- [ ] Core error handling
-- [ ] Transport layer
+### Milestone 1: Foundation (Complete)
 
-### Milestone 2: Core Features
-- [ ] Error event listeners
-- [ ] Breadcrumb tracking
-- [ ] Error categorization
-- [ ] Basic transport
+- [x] Init project
+- [x] Global error capture
+- [x] Deduplication + sampling
+- [x] Basic processor
 
-### Milestone 3: Advanced Features
-- [ ] Performance monitoring
-- [ ] React integration
-- [ ] Next.js optimizations
-- [ ] Advanced sampling
+### Milestone 2: React Integration 🚧
 
-### Milestone 4: Production Ready
-- [ ] Production testing
-- [ ] Performance optimization
-- [ ] Documentation completion
-- [ ] Release preparation
+- [ ] ErrorBoundary component
+- [ ] Fetch + API errors
+- [ ] RTK Query middleware
+- [ ] Asset load errors
+
+### Milestone 3: Server + SSR
+
+- [ ] API route wrapper
+- [ ] SSR/SSG error capture
+- [ ] Hydration mismatch handling
+
+### Milestone 4: Enriched Payloads
+
+- [ ] Metadata injection
+- [ ] Session management
+- [ ] Breadcrumb attachments
+- [ ] User context
+
+### Milestone 5: Reporting
+
+- [ ] API reporting
+- [ ] S3 upload
+- [ ] Configurable delivery
