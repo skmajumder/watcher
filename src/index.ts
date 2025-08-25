@@ -240,3 +240,5 @@ export function initWatcher(userConfig: WatcherConfig = {} as WatcherConfig) {
  * - Better developer experience
  */
 export * from './types/types';
+export { WatcherErrorBoundary } from './handlers/reactBoundary';
+export { withWatcherBoundary } from './handlers/withBoundary';
