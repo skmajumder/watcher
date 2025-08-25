@@ -14,11 +14,11 @@ export type WatcherEnv = 'development' | 'production' | 'test' | 'staging';
 /**
  * Configuration interface for the Watcher SDK
  * Contains all configurable options for error tracking and SDK behavior
- * 
+ *
  * @example
  * ```typescript
  * import { initWatcher } from 'watcher';
- * 
+ *
  * initWatcher({
  *   environment: 'production',
  *   sampleRate: 0.1,
@@ -50,7 +50,8 @@ export type ErrorKind =
   | 'runtime_error' // General JavaScript runtime errors
   | 'unhandled_promise' // Unhandled promise rejections
   | 'render_error' // React rendering errors
-  | 'network_error'; // Network request failures
+  | 'network_error' // Network request failures
+  | 'render_error'; // React rendering errors
 
 /**
  * Complete error information payload
@@ -65,6 +66,8 @@ export interface ErrorPayload {
   message?: string;
   /** Full error stack trace for debugging */
   stack?: string;
+  /** Stack trace for React rendering errors */
+  componentStack?: string;
   /** Source file or component where error occurred */
   source?: string;
   /** Line and column position in the source file (format: "line:col") */
