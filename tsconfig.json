@@ -31,7 +31,9 @@
     "forceConsistentCasingInFileNames": true,
     
     // Don't emit files during type checking (tsup handles the build)
-    "noEmit": true
+    "noEmit": true,
+
+    "jsx": "react-jsx"
   },
   
   // Include source files and tests in compilation
