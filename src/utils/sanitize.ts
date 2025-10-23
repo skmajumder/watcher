@@ -153,8 +153,11 @@ export function sanitizeUrl(url: string): string | undefined {
  *   truncate('Hello World', 5); // "Hello…[truncated]"
  *   truncate('Short', 10);      // "Short"
  */
-export function truncate(s?: string, max = 10_000): string | undefined {
-  if (typeof s !== 'string') return s as any;
+export function truncate(
+  s: string | undefined,
+  max = 2_000,
+): string | undefined {
+  if (!s || typeof s !== 'string') return s as any;
   return s.length > max ? s.slice(0, max) + '…[truncated]' : s;
 }
 

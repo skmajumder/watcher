@@ -30,7 +30,7 @@
  * ```
  */
 export const isBrowser = (): boolean =>
-  typeof window !== 'undefined' && typeof document !== 'undefined';
+  typeof window !== 'undefined' && typeof window.fetch === 'function';
 
 /**
  * Determines if the code is running in a server environment

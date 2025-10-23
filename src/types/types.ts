@@ -84,4 +84,10 @@ export interface ErrorPayload {
   environment?: WatcherEnv;
   /** Unique session identifier for user tracking */
   sessionId?: string;
+  method?: string;
+  status?: number;
+  statusText?: string;
+  requestBodySnippet?: string;
+  responseSnippet?: string;
+  durationMs?: number;
 }

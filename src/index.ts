@@ -44,7 +44,10 @@
  */
 
 import { defaultConfig } from './config/defaults';
+import { baseFields } from './core/base';
 import { setConfig } from './core/config';
+import { processError } from './core/processor';
+import { installFetchWrapper } from './handlers/fetch';
 import { installGlobalHandlers } from './handlers/global';
 import type { WatcherConfig, WatcherEnv } from './types/types';
 import { isNode } from './utils';
@@ -190,6 +193,10 @@ export function initWatcher(userConfig: WatcherConfig = {} as WatcherConfig) {
   // Install environment-specific error handlers
   // Currently fully implemented with error normalization and handler chaining
   installGlobalHandlers(cfg);
+
+  if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+    installFetchWrapper(processError, () => baseFields(cfg));
+  }
 
   // Log successful initialization with configuration summary
   console.log('[watcher] initialized with config:', {
