@@ -84,10 +84,16 @@ export interface ErrorPayload {
   environment?: WatcherEnv;
   /** Unique session identifier for user tracking */
   sessionId?: string;
+  /** HTTP method for network errors (e.g., GET, POST) */
   method?: string;
+  /** HTTP status code for network errors (e.g., 404, 500) */
   status?: number;
+  /** HTTP status text for network errors (e.g., Not Found) */
   statusText?: string;
+  /** Safe, truncated snippet of request body (if available) */
   requestBodySnippet?: string;
+  /** Safe, truncated snippet of response body (if available) */
   responseSnippet?: string;
+  /** Request duration in milliseconds (client-observed) */
   durationMs?: number;
 }
